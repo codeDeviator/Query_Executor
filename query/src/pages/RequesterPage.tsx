@@ -8,7 +8,7 @@ interface Query {
   query: string;
   query_description: string;
   requested_at: string;
-  approver_name?: string; // Change to string
+  approver_name?: string;
   approved_by?: number;
   status: string;
 }
@@ -23,7 +23,7 @@ const RequesterPage = () => {
   // ✅ Retrieve requesterId dynamically
   const userData = localStorage.getItem("user");
   const user = userData ? JSON.parse(userData) : null;
-  const requesterId = user?.userId;
+  const requesterId = user?.userId; 
 
   // ✅ Fetch Queries Function
   const fetchQueries = async () => {
@@ -53,11 +53,11 @@ const RequesterPage = () => {
     if (requesterId) {
       fetchQueries();
     }
-  }, [requesterId]);
+  }, [requesterId]); 
 
   // ✅ Query Submission Function
   const handleQuerySubmit = async (formData: any) => {
-    setSubmitting(true);
+    setSubmitting(true); 
 
     try {
       const response = await axios.post("http://localhost:5000/submit-query", formData);
@@ -84,7 +84,7 @@ const RequesterPage = () => {
           <button
             onClick={() => navigate("/create-query")}
             className="px-6 py-3 bg-pink-600 text-white rounded-lg text-lg font-semibold hover:bg-pink-700 transition"
-            disabled={submitting}
+            disabled={submitting} 
           >
             {submitting ? "Submitting..." : "Create New Query"}
           </button>
@@ -128,9 +128,7 @@ const RequesterPage = () => {
                         <td className="border p-3">
                           {new Date(query.requested_at).toLocaleString()}
                         </td>
-                        <td className="border p-3">
-                          {query.approver_name || "-"}
-                        </td>
+                        <td className="border p-3">{query.approver_name || "-"}</td>
                         <td className="border p-3">{query.approved_by || "-"}</td>
                         <td className="border p-3 text-center">{query.status}</td>
                       </tr>
