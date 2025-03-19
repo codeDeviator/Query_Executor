@@ -32,7 +32,7 @@ const RequesterFormPage: React.FC = () => {
         const user = JSON.parse(userData);
         setFormData((prevData) => ({
           ...prevData,
-          userId: user?.userId,
+          userId: user?.userId || "",
           requesterName: user?.name || "Unknown User",
         }));
       } catch (error) {
@@ -72,26 +72,16 @@ const RequesterFormPage: React.FC = () => {
   };
   
 
-
-  
-
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
   
-    // Collect approver names based on selected approverIds
-    const selectedApprovers = approvers
-      .filter((approver) => formData.approverIds.includes(String(approver.id)))
-      .map((approver) => approver.name);
-  
     // Ensure requesterId is set properly
     const payload = {
-      requesterId: formData.userId,
+      requesterId: formData.userId, // ✅ Rename userId to requesterId
       dbName: formData.dbName,
       query: formData.query,
       queryDescription: formData.queryDescription,
       approverIds: formData.approverIds,
-      approver_name: selectedApprovers.join(", "), // Send approver names as a comma-separated string
     };
   
     console.log("Payload before submission:", payload); // Debugging
@@ -129,6 +119,7 @@ const RequesterFormPage: React.FC = () => {
     }
   };
   
+  
 
 
   return (
@@ -149,13 +140,7 @@ const RequesterFormPage: React.FC = () => {
           <input type="text" value={formData.requesterName} readOnly className="block w-full px-6 py-3 border border-gray-300 rounded-lg bg-gray-100" />
 
           <label className="block text-lg font-semibold">Created At</label>
-<input 
-  type="text" 
-  value={new Date(formData?.createdAt || Date.now()).toLocaleString()} 
-  readOnly 
-  className="block w-full px-6 py-3 border border-gray-300 rounded-lg bg-gray-100" 
-/>
-
+          <input type="datetime-local" value={formData.createdAt} readOnly className="block w-full px-6 py-3 border border-gray-300 rounded-lg bg-gray-100" />
 
           <label className="block text-lg font-semibold">Query</label>
           <input type="text" value={formData.query} onChange={(e) => setFormData({ ...formData, query: e.target.value })} className="block w-full px-6 py-3 border border-gray-300 rounded-lg" required />
