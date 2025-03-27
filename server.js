@@ -1195,6 +1195,41 @@ const sendVerificationEmail = async (email, verificationToken) => {
   await transporter.sendMail(mailOptions);
 };
 
+// app.post("/signup", async (req, res) => {
+//   const { name, email, password, role } = req.body;
+//   if (!name || !email || !password || !role) {
+//     return res.status(400).json({ error: "All fields are required" });
+//   }
+
+//   try {
+//     const hashedPassword = await bcrypt.hash(password, 10);
+//     const verificationToken = crypto.randomBytes(20).toString("hex");
+
+//     // Insert into users table
+//     const result = await pool.query(
+//       "INSERT INTO users (name, email, password, role, verification_token, verified) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+//       [name, email, hashedPassword, role, verificationToken, false]
+//     );
+
+//     const userId = result.rows[0].id;
+
+//     // Insert into role-specific tables
+//     if (role === "executor") {
+//       await pool.query("INSERT INTO executor (executor_id) VALUES ($1)", [userId]);
+//     } else if (role === "approver") {
+//       await pool.query("INSERT INTO approver (approver_id) VALUES ($1)", [userId]);
+//     }
+
+//     // Send verification email
+//     await sendVerificationEmail(email, verificationToken);
+
+//     res.status(201).json({ message: "User registered successfully. Please check your email to verify your account.", userId });
+//   } catch (err) {
+//     console.error("❌ Signup Error:", err.message);
+//     res.status(500).json({ error: "Internal Server Error" });
+//   }
+// });
+
 app.post("/signup", async (req, res) => {
   const { name, email, password, role } = req.body;
   if (!name || !email || !password || !role) {
@@ -1213,12 +1248,12 @@ app.post("/signup", async (req, res) => {
 
     const userId = result.rows[0].id;
 
-    // Insert into role-specific tables
+    // Insert into executor table if role is executor
     if (role === "executor") {
       await pool.query("INSERT INTO executor (executor_id) VALUES ($1)", [userId]);
-    } else if (role === "approver") {
-      await pool.query("INSERT INTO approver (approver_id) VALUES ($1)", [userId]);
     }
+
+    // Do not insert into approver table during signup
 
     // Send verification email
     await sendVerificationEmail(email, verificationToken);
@@ -1362,6 +1397,48 @@ app.post("/login", async (req, res) => {
 /**
  * 🔹 Submit a Query
  */
+// app.post("/submit-query", async (req, res) => {
+//   try {
+//     const { requesterId, dbName, query, queryDescription, approverIds } = req.body;
+
+//     if (!requesterId || !dbName || !query || !queryDescription || !approverIds || approverIds.length === 0) {
+//       return res.status(400).json({ error: "Missing required fields" });
+//     }
+
+//     const client = await pool.connect();
+//     try {
+//       // Insert into requester table and get query_id
+//       const queryInsert = `
+//         INSERT INTO requester (db_name, query, query_description, requested_at, requester_id) 
+//         VALUES ($1, $2, $3, NOW(), $4) RETURNING id;
+//       `;
+//       const result = await client.query(queryInsert, [dbName, query, queryDescription, requesterId]);
+//       const queryId = result.rows[0].id;
+
+//       // Insert into approver table for each approver
+//       const insertApprover = `
+//         INSERT INTO approver (query_id, requested_by, requested_at, approver_id, status, query, database_name, query_content, approved_by) 
+//         VALUES ($1, $2, NOW(), $3, 'pending', $4, $5, $6, $7)
+//         ON CONFLICT DO NOTHING;
+//       `;
+
+//       for (const approverId of approverIds) {
+//         await client.query(insertApprover, [queryId, requesterId, approverId, query, dbName, queryDescription, "System"]);
+//       }
+
+//       res.json({ message: "Query submitted successfully", queryId });
+//     } finally {
+//       client.release();
+//     }
+//   } catch (error) {
+//     console.error("Error processing request:", error);
+//     res.status(500).json({ error: "Internal server error" });
+//   }
+// });
+
+// ----------------------------------------------------------------------
+
+// 23
 app.post("/submit-query", async (req, res) => {
   try {
     const { requesterId, dbName, query, queryDescription, approverIds } = req.body;
@@ -1382,13 +1459,13 @@ app.post("/submit-query", async (req, res) => {
 
       // Insert into approver table for each approver
       const insertApprover = `
-        INSERT INTO approver (query_id, requested_by, requested_at, approver_id, status, query, database_name, query_content, approved_by) 
-        VALUES ($1, $2, NOW(), $3, 'pending', $4, $5, $6, $7)
+        INSERT INTO approver (query_id, requested_by, requested_at, approver_id, status, query, database_name, query_content) 
+        VALUES ($1, $2, NOW(), $3, 'pending', $4, $5, $6)
         ON CONFLICT DO NOTHING;
       `;
 
       for (const approverId of approverIds) {
-        await client.query(insertApprover, [queryId, requesterId, approverId, query, dbName, queryDescription, "System"]);
+        await client.query(insertApprover, [queryId, requesterId, approverId, query, dbName, queryDescription]);
       }
 
       res.json({ message: "Query submitted successfully", queryId });
@@ -1475,40 +1552,71 @@ app.get("/queries/requester/:requesterId", async (req, res) => {
 
 
 // Fetch queries assigned to the approver
-app.get("/queries/approver/:approverId", async (req, res) => {
-  try {
-    const { approverId } = req.params;
-    console.log(`Fetching queries for Approver ID: ${approverId}`);
+// app.get("/queries/approver/:approverId", async (req, res) => {
+//   try {
+//     const { approverId } = req.params;
+//     console.log(`Fetching queries for Approver ID: ${approverId}`);
 
+//     const result = await pool.query(
+//       `SELECT 
+//           id, 
+//           query_id, 
+//           requested_by, 
+//           requested_at, 
+//           approver_id, 
+//           status, 
+//           approved_at, 
+//           query, 
+//           database_name, 
+//           query_content, 
+//           approved_by 
+//       FROM approver 
+//       WHERE approver_id = $1 OR status = 'pending'`,
+//       [approverId]
+//     );
+
+//     console.log("✅ Approver Queries:", result.rows);
+//     res.json(result.rows);
+//   } catch (err) {
+//     console.error("Error fetching queries:", err.message);
+//     res.status(500).send("Server Error");
+//   }
+// });
+
+app.get("/queries/approver/:approverId", async (req, res) => {
+  const { approverId } = req.params;
+
+  try {
     const result = await pool.query(
       `SELECT 
-          id, 
-          query_id, 
-          requested_by, 
-          requested_at, 
-          approver_id, 
-          status, 
-          approved_at, 
-          query, 
-          database_name, 
-          query_content, 
-          approved_by 
-      FROM approver 
-      WHERE approver_id = $1 OR status = 'pending'`,
+          a.id,
+          r.id AS query_id, 
+          u.name AS requested_by, 
+          r.requested_at, 
+          a.status, 
+          a.approved_at,  
+          a.approved_by,
+          r.query, 
+          r.db_name AS database_name, 
+          r.query_description 
+       FROM approver a
+       JOIN requester r ON a.query_id = r.id
+       JOIN users u ON r.requester_id = u.id
+       WHERE a.approver_id = $1
+       ORDER BY r.requested_at DESC`,
       [approverId]
     );
 
-    console.log("✅ Approver Queries:", result.rows);
     res.json(result.rows);
   } catch (err) {
-    console.error("Error fetching queries:", err.message);
-    res.status(500).send("Server Error");
+    console.error("Error fetching approver queries:", err);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-/**
- * 🔹 Approver: Fetch Queries
- */
+// /**
+//  * 🔹 Approver: Fetch Queries
+//  */
 app.get("/queries/approver/:approverId", async (req, res) => {
   const { approverId } = req.params;
 
@@ -1538,70 +1646,174 @@ app.get("/queries/approver/:approverId", async (req, res) => {
   }
 });
 
+// ----------------------------------------------
+// 23
+// app.get("/queries/approver/:approverId", async (req, res) => {
+//   const { approverId } = req.params;
+
+//   try {
+//     const result = await pool.query(
+//       `SELECT 
+//           r.id AS query_id, 
+//           u.name AS requested_by, 
+//           r.requested_at, 
+//           r.status, 
+//           a.approved_at,  
+//           r.query, 
+//           r.db_name AS database_name, 
+//           r.query_description 
+//        FROM requester r
+//        JOIN users u ON r.requester_id = u.id
+//        LEFT JOIN approver a ON r.id = a.query_id  
+//        WHERE (r.status = 'pending' OR a.approver_id = $1)
+//        ORDER BY r.requested_at DESC`,
+//       [approverId]
+//     );
+
+//     res.json(result.rows);
+//   } catch (err) {
+//     console.error("❌ Error fetching approver queries:", err.message);
+//     res.status(500).json({ error: "Internal Server Error" });
+//   }
+// });
 /**
  * 🔹 Update Query Status (Approver)
  */
+
+
+app.get("/query/:queryId", async (req, res) => {
+  const { queryId } = req.params;
+
+  try {
+    const result = await pool.query(
+      `SELECT 
+          r.id, 
+          r.db_name, 
+          r.query, 
+          r.query_description, 
+          r.requested_at,
+          r.status,
+          u.name AS approver_name, 
+          a.approved_by
+       FROM requester r
+       LEFT JOIN approver a ON r.id = a.query_id
+       LEFT JOIN users u ON a.approver_id = u.id
+       WHERE r.id = $1`,
+      [queryId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Query not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("❌ Error fetching query details:", err.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+
+
+// app.post("/update-query-status", async (req, res) => {
+//   const { query_id, status, approver_id } = req.body;
+
+//   console.log("🔹 Received request:", req.body);
+
+//   // 🔍 Validate required fields
+//   if (!query_id || !status || !approver_id) {
+//     console.error("❌ Missing required fields:", { query_id, status, approver_id });
+//     return res.status(400).json({ error: "Missing required fields" });
+//   }
+
+//   // 🔍 Ensure status is valid
+//   const validStatuses = ["pending", "approved", "rejected"];
+//   if (!validStatuses.includes(status.toLowerCase())) {
+//     console.error("❌ Invalid status value:", status);
+//     return res.status(400).json({ error: "Invalid status value" });
+//   }
+
+//   try {
+//     // 🛠 Check if queryId exists in the requester table
+//     console.log("🔍 Checking if queryId exists:", query_id);
+//     const queryExists = await pool.query(`SELECT id FROM requester WHERE id = $1`, [query_id]);
+
+//     if (queryExists.rowCount === 0) {
+//       console.error("❌ Query ID does not exist:", query_id);
+//       return res.status(404).json({ error: "Invalid Query ID" });
+//     }
+
+//     // 🛠 Check if approverId exists in the users table
+//     console.log("🔍 Checking if approverId exists:", approver_id);
+//     const approverExists = await pool.query(`SELECT id FROM users WHERE id = $1`, [approver_id]);
+
+//     if (approverExists.rowCount === 0) {
+//       console.error("❌ Approver ID does not exist:", approver_id);
+//       return res.status(404).json({ error: "Invalid Approver ID" });
+//     }
+
+//     // 🛠 Update the query status in the approver table
+//     console.log("🔹 Updating query status...");
+//     const result = await pool.query(
+//       `UPDATE approver 
+//        SET status = $1, approver_id = $2 
+//        WHERE query_id = $3 
+//        RETURNING *`,
+//       [status, approver_id, query_id]
+//     );
+
+//     if (result.rowCount === 0) {
+//       console.error("❌ Query not found in approver table:", query_id);
+//       return res.status(404).json({ error: "Query not found in approver table" });
+//     }
+
+//     console.log("✅ Query status updated successfully:", result.rows[0]);
+//     res.json({ message: "Query status updated successfully", data: result.rows[0] });
+
+//   } catch (err) {
+//     console.error("❌ Error updating query status:", err.message);
+//     res.status(500).json({ error: "Internal Server Error", details: err.message });
+//   }
+// });
+
+
 app.post("/update-query-status", async (req, res) => {
   const { query_id, status, approver_id } = req.body;
 
-  console.log("🔹 Received request:", req.body);
-
-  // 🔍 Validate required fields
+  // Validate input
   if (!query_id || !status || !approver_id) {
-    console.error("❌ Missing required fields:", { query_id, status, approver_id });
     return res.status(400).json({ error: "Missing required fields" });
   }
 
-  // 🔍 Ensure status is valid
-  const validStatuses = ["pending", "approved", "rejected"];
-  if (!validStatuses.includes(status.toLowerCase())) {
-    console.error("❌ Invalid status value:", status);
-    return res.status(400).json({ error: "Invalid status value" });
-  }
-
   try {
-    // 🛠 Check if queryId exists in the requester table
-    console.log("🔍 Checking if queryId exists:", query_id);
-    const queryExists = await pool.query(`SELECT id FROM requester WHERE id = $1`, [query_id]);
-
-    if (queryExists.rowCount === 0) {
-      console.error("❌ Query ID does not exist:", query_id);
-      return res.status(404).json({ error: "Invalid Query ID" });
-    }
-
-    // 🛠 Check if approverId exists in the users table
-    console.log("🔍 Checking if approverId exists:", approver_id);
-    const approverExists = await pool.query(`SELECT id FROM users WHERE id = $1`, [approver_id]);
-
-    if (approverExists.rowCount === 0) {
-      console.error("❌ Approver ID does not exist:", approver_id);
-      return res.status(404).json({ error: "Invalid Approver ID" });
-    }
-
-    // 🛠 Update the query status in the approver table
-    console.log("🔹 Updating query status...");
+    // Explicitly cast parameters to ensure type consistency
     const result = await pool.query(
       `UPDATE approver 
-       SET status = $1, approver_id = $2 
-       WHERE query_id = $3 
+       SET status = $1::text, 
+           approver_id = $2::integer,
+           approved_by = $2::integer,
+           approved_at = CASE WHEN $1::text = 'approved' THEN NOW() ELSE NULL END
+       WHERE query_id = $3::integer
        RETURNING *`,
       [status, approver_id, query_id]
     );
 
     if (result.rowCount === 0) {
-      console.error("❌ Query not found in approver table:", query_id);
-      return res.status(404).json({ error: "Query not found in approver table" });
+      return res.status(404).json({ error: "Query not found" });
     }
 
-    console.log("✅ Query status updated successfully:", result.rows[0]);
-    res.json({ message: "Query status updated successfully", data: result.rows[0] });
-
+    res.json({ 
+      message: "Query status updated successfully", 
+      data: result.rows[0] 
+    });
   } catch (err) {
-    console.error("❌ Error updating query status:", err.message);
-    res.status(500).json({ error: "Internal Server Error", details: err.message });
+    console.error("Error updating query status:", err);
+    res.status(500).json({ 
+      error: "Internal Server Error",
+      details: err.message 
+    });
   }
 });
-
 
 
 // app.get("/queries/approver/:approverId", async (req, res) => {

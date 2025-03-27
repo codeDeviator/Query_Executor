@@ -10,6 +10,10 @@
   "compilerOptions": {
     "moduleResolution": "node",
     "esModuleInterop": true,
-    "jsx": "react-jsx"  // Ensures JSX works in TypeScript
+    "jsx": "react-jsx", // Ensures JSX works in TypeScript
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   }
 }

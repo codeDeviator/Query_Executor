@@ -413,6 +413,7 @@ import ExecutorPage from "./pages/ExecutorPage";
 import RequesterFormPage from "./pages/RequesterFormPage";
 import QueryDetailsPage from "./pages/QueryDetailsPage";
 import ApproverDetailsPage from "./pages/ApproverDetailsPage";
+// import AdminPanel from "./pages/AdminPanel";
 
 const API_BASE_URL = "http://localhost:5000";
 
@@ -627,6 +628,7 @@ const App = () => {
         <Route path="/create-query" element={<ProtectedRoute><RequesterFormPage /></ProtectedRoute>} />
         <Route path="/query/:queryId" element={<ProtectedRoute><QueryDetailsPage /></ProtectedRoute>} />
         <Route path="/approver/:queryId" element={<ProtectedRoute><ApproverDetailsPage /></ProtectedRoute>} />
+        {/* <Route path="/AdminPanel" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} /> */}
       </Routes>
     </Router>
   );

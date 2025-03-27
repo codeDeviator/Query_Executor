@@ -42,47 +42,77 @@ const ApproverDetailsPage: React.FC<ApproverDetailsPageProps> = ({ onStatusChang
     if (queryId) fetchQuery();
   }, [queryId]);
 
-  const handleAction = async (action: "approved" | "rejected" | "pending") => {
-    console.log("🟡 Query object:", query);
+  // const handleAction = async (action: "approved" | "rejected" | "pending") => {
+  //   console.log("🟡 Query object:", query);
   
-    if (!query?.query_id) {
-      console.error("❌ Missing Query ID!");
-      setError("Query ID is missing.");
-      return;
-    }
+  //   if (!query?.query_id) {
+  //     console.error("❌ Missing Query ID!");
+  //     setError("Query ID is missing.");
+  //     return;
+  //   }
 
-    const updatedStatus = action.toLowerCase();
+  //   const updatedStatus = action.toLowerCase();
 
-    const payload = {
-      query_id: query.query_id,
-      status: updatedStatus,
-      approver_id: query.approver_id || 4, // Use a default value if null
-    };
+  //   const payload = {
+  //     query_id: query.query_id,
+  //     status: updatedStatus,
+  //     approver_id: query.approver_id || 4, // Use a default value if null
+  //   };
 
-    console.log("🔹 Sending request with payload:", payload);
+  //   console.log("🔹 Sending request with payload:", payload);
   
-    try {
-      const response = await axios.post("http://localhost:5000/update-query-status", payload, {
-        headers: { "Content-Type": "application/json" },
-      });
+  //   try {
+  //     const response = await axios.post("http://localhost:5000/update-query-status", payload, {
+  //       headers: { "Content-Type": "application/json" },
+  //     });
   
-      console.log("✅ Response:", response.data);
-      setQuery((prev) => (prev ? { ...prev, status: updatedStatus } : prev)); // ✅ Update state locally
+  //     console.log("✅ Response:", response.data);
+  //     setQuery((prev) => (prev ? { ...prev, status: updatedStatus } : prev)); // ✅ Update state locally
       
-      if (onStatusChange) {
-        onStatusChange(); // ✅ Check if function exists before calling
-      }
+  //     if (onStatusChange) {
+  //       onStatusChange(); // ✅ Check if function exists before calling
+  //     }
 
-      navigate("/approver");
-    } catch (err) {
-      console.error("❌ Error updating status:", err);
-      if (axios.isAxiosError(err)) {
-        setError(err.response?.data?.error || "Failed to update query status.");
-      } else {
-        setError("An unexpected error occurred.");
-      }
-    }
+  //     navigate("/approver");
+  //   } catch (err) {
+  //     console.error("❌ Error updating status:", err);
+  //     if (axios.isAxiosError(err)) {
+  //       setError(err.response?.data?.error || "Failed to update query status.");
+  //     } else {
+  //       setError("An unexpected error occurred.");
+  //     }
+  //   }
+  // };
+
+  const handleAction = async (action: "approved" | "rejected" | "pending") => {
+  const userData = localStorage.getItem("user");
+  const user = userData ? JSON.parse(userData) : null;
+  
+  if (!user?.userId) {
+    setError("User information missing. Please log in again.");
+    return;
+  }
+
+  const payload = {
+    query_id: query?.query_id,
+    status: action,
+    approver_id: user.userId  // Use the logged-in user's ID
   };
+
+  try {
+    const response = await axios.post(
+      "http://localhost:5000/update-query-status", 
+      payload,
+      { headers: { "Content-Type": "application/json" } }
+    );
+    
+    // Refresh the data
+    if (onStatusChange) onStatusChange();
+    navigate("/approver");
+  } catch (err) {
+    setError("Failed to update status. Please try again.");
+  }
+};
 
   if (loading) return <div className="text-center text-white text-lg">Loading query details...</div>;
   if (error) return <div className="text-center text-red-500">{error}</div>;

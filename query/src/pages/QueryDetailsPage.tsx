@@ -497,10 +497,10 @@ const QueryDetailsPage = () => {
               </span>
             </p>
             <p className="text-lg">
-              <strong>Approver:</strong> {query.approver_name || "Not Available"}
+              <strong>Approved By (ID):</strong> {query.approver_name || "Not Available"}
             </p>
             <p className="text-lg">
-              <strong>Approved By (ID):</strong> {query.approved_by ?? "Not Available"}
+              <strong>Approver:</strong> {query.approved_by ?? "Not Available"}
             </p>
           </div>
         ) : (
